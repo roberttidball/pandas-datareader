@@ -1,6 +1,6 @@
 from pandas import Timestamp
 
-from pandas_datareader.fxmacrodata import FXMacroDataCalendarReader
+from pandas_datareader.fxmacrodata import FXMacroDataCalendarReader, FXMacroDataClient
 
 
 def test_fxmacrodata_calendar_reader_parses_and_filters_events():
@@ -30,3 +30,16 @@ def test_fxmacrodata_calendar_reader_parses_and_filters_events():
     assert list(frame["release"]) == ["nfp"]
     assert frame.index[0] == Timestamp("2026-07-08")
     assert str(frame["announcement_datetime"].dtype) == "datetime64[ns, UTC]"
+
+
+def test_fxmacrodata_client_flattens_catalogue_payload():
+    payload = {
+        "data": {
+            "inflation": {"name": "Consumer Price Index", "frequency": "monthly"},
+            "policy_rate": {"name": "Policy Rate", "frequency": "scheduled"},
+        }
+    }
+
+    frame = FXMacroDataClient().to_dataframe(payload, index=False)
+
+    assert list(frame["indicator"]) == ["inflation", "policy_rate"]

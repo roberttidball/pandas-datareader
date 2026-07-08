@@ -13,12 +13,13 @@ from pandas_datareader.eurostat import EurostatReader
 from pandas_datareader.exceptions import DEP_ERROR_MSG, ImmediateDeprecationError
 from pandas_datareader.famafrench import FamaFrenchReader
 from pandas_datareader.fred import FredReader
-from pandas_datareader.fxmacrodata import FXMacroDataCalendarReader
+from pandas_datareader.fxmacrodata import FXMacroDataCalendarReader, FXMacroDataReader
 from pandas_datareader.oecd import OECDReader
 
 __all__ = [
     "get_data_econdb",
     "get_data_famafrench",
+    "get_data_fxmacrodata",
     "get_data_fxmacrodata_calendar",
     "get_data_fred",
     "DataReader",
@@ -35,6 +36,10 @@ def get_data_famafrench(*args, **kwargs):
 
 def get_data_econdb(*args, **kwargs):
     return EcondbReader(*args, **kwargs).read()
+
+
+def get_data_fxmacrodata(*args, **kwargs):
+    return FXMacroDataReader(*args, **kwargs).read()
 
 
 def get_data_fxmacrodata_calendar(*args, **kwargs):
@@ -164,7 +169,7 @@ def DataReader(
             api_key=api_key,
         ).read()
     if data_source == "fxmacrodata":
-        return FXMacroDataCalendarReader(
+        return FXMacroDataReader(
             symbols=name,
             start=start,
             end=end,
