@@ -13,11 +13,13 @@ from pandas_datareader.eurostat import EurostatReader
 from pandas_datareader.exceptions import DEP_ERROR_MSG, ImmediateDeprecationError
 from pandas_datareader.famafrench import FamaFrenchReader
 from pandas_datareader.fred import FredReader
+from pandas_datareader.fxmacrodata import FXMacroDataCalendarReader
 from pandas_datareader.oecd import OECDReader
 
 __all__ = [
     "get_data_econdb",
     "get_data_famafrench",
+    "get_data_fxmacrodata_calendar",
     "get_data_fred",
     "DataReader",
 ]
@@ -33,6 +35,10 @@ def get_data_famafrench(*args, **kwargs):
 
 def get_data_econdb(*args, **kwargs):
     return EcondbReader(*args, **kwargs).read()
+
+
+def get_data_fxmacrodata_calendar(*args, **kwargs):
+    return FXMacroDataCalendarReader(*args, **kwargs).read()
 
 
 @deprecate_kwarg("access_key", "api_key")
@@ -58,7 +64,8 @@ def DataReader(
         the name of the dataset. Some data sources (fred) will
         accept a list of names.
     data_source: {str, None}
-        the data source ("fred", "famafrench", "oecd", "eurostat", "econdb")
+        the data source ("fred", "famafrench", "oecd", "eurostat", "econdb",
+        "fxmacrodata")
     start : string, int, date, datetime, Timestamp
         left boundary for range (defaults to 1/1/2010)
     end : string, int, date, datetime, Timestamp
@@ -91,6 +98,7 @@ def DataReader(
         "oecd",
         "eurostat",
         "econdb",
+        "fxmacrodata",
     ]
 
     if data_source not in expected_source:
@@ -147,6 +155,16 @@ def DataReader(
         ).read()
     if data_source == "econdb":
         return EcondbReader(
+            symbols=name,
+            start=start,
+            end=end,
+            retry_count=retry_count,
+            pause=pause,
+            session=session,
+            api_key=api_key,
+        ).read()
+    if data_source == "fxmacrodata":
+        return FXMacroDataCalendarReader(
             symbols=name,
             start=start,
             end=end,
