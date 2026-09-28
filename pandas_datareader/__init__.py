@@ -6,9 +6,9 @@ from .data import (
     DataReader,
     get_data_econdb,
     get_data_famafrench,
+    get_data_fred,
     get_data_fxmacrodata,
     get_data_fxmacrodata_calendar,
-    get_data_fred,
 )
 from .macro import (
     EurostatClient,
