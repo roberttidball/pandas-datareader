@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 import json
 from urllib.parse import parse_qs, urlparse
+from urllib.request import HTTPRedirectHandler
 
 from pandas import Timestamp
 import pytest
@@ -165,3 +166,22 @@ def test_fxmacrodata_reader_reads_whole_window(fake_api):
     query = parse_qs(urlparse(fake_api[0].full_url).query)
     assert query["start_date"] == ["2024-01-01"]
     assert query["end_date"] == ["2024-12-31"]
+
+
+def test_api_key_is_not_forwarded_on_redirect(fake_api):
+    client = fxmacrodata.FXMacroDataClient(api_key="test-key")
+    client.fetch_dataset("forex", base="eur", quote="usd", limit=5)
+    redirected = HTTPRedirectHandler().redirect_request(
+        fake_api[0], None, 302, "Found", {}, "https://other.example/v1/forex"
+    )
+    assert redirected.get_header("X-api-key") is None
+
+
+def test_api_key_is_stripped_and_rejected_without_echo(fake_api):
+    client = fxmacrodata.FXMacroDataClient(api_key="  test-key\n")
+    client.fetch_dataset("forex", base="eur", quote="usd", limit=5)
+    assert fake_api[0].get_header("X-api-key") == "test-key"
+
+    with pytest.raises(ValueError) as excinfo:
+        fxmacrodata.FXMacroDataClient(api_key="test-key\r\nX-Other: 1")
+    assert "test-key" not in str(excinfo.value)

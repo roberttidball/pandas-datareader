@@ -125,6 +125,16 @@ def _env_api_key():
     return None
 
 
+def _clean_api_key(value):
+    key = (value or "").strip()
+    if any(ch.isspace() or not ch.isprintable() for ch in key):
+        # Never echo the key itself in the error.
+        raise ValueError(
+            "FXMacroData API key contains whitespace or control characters"
+        )
+    return key or None
+
+
 def _dataset_name(dataset):
     normalized = dataset.lower().replace("-", "_")
     return FXMACRODATA_DATASET_ALIASES.get(normalized, normalized)
@@ -219,15 +229,19 @@ class FXMacroDataClient:
     """Small client for the public FXMacroData read/data API surface."""
 
     def __init__(self, api_key=None, base_url=FXMACRODATA_BASE_URL, timeout=30):
-        self.api_key = api_key or _env_api_key()
+        self.api_key = _clean_api_key(api_key or _env_api_key())
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
     def _headers(self):
-        headers = {"User-Agent": "fxmacrodata-integration"}
+        return {"User-Agent": "fxmacrodata-integration"}
+
+    def _with_key(self, request):
+        # Unredirected headers are not copied onto a redirect, so the key is
+        # never forwarded to another host.
         if self.api_key:
-            headers["X-API-Key"] = self.api_key
-        return headers
+            request.add_unredirected_header("X-API-Key", self.api_key)
+        return request
 
     def fetch_dataset(self, dataset, **kwargs):
         dataset = _dataset_name(dataset)
@@ -243,7 +257,7 @@ class FXMacroDataClient:
         url = "%s/%s" % (self.base_url, path.lstrip("/"))
         if query:
             url = "%s?%s" % (url, urlencode(query))
-        request = Request(url, headers=self._headers())
+        request = self._with_key(Request(url, headers=self._headers()))
         with urlopen(request, timeout=self.timeout) as response:  # nosec B310
             return json.loads(response.read().decode("utf-8"))
 
@@ -251,11 +265,13 @@ class FXMacroDataClient:
         body = json.dumps({"query": query, "variables": variables or {}}).encode(
             "utf-8"
         )
-        request = Request(
-            "%s/graphql" % self.base_url,
-            data=body,
-            headers={"Content-Type": "application/json", **self._headers()},
-            method="POST",
+        request = self._with_key(
+            Request(
+                "%s/graphql" % self.base_url,
+                data=body,
+                headers={"Content-Type": "application/json", **self._headers()},
+                method="POST",
+            )
         )
         with urlopen(request, timeout=self.timeout) as response:  # nosec B310
             return json.loads(response.read().decode("utf-8"))
