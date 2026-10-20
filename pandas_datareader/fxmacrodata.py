@@ -167,11 +167,18 @@ def _format_path(path_template, kwargs):
         ) from exc
 
 
+def _validated_payload(payload):
+    if not isinstance(payload, (dict, list)):
+        raise ValueError("FXMacroData returned an invalid response")
+    if isinstance(payload, dict) and ("detail" in payload or "error" in payload):
+        raise ValueError("FXMacroData returned an error response")
+    return payload
+
+
 def _payload_rows(payload):
+    payload = _validated_payload(payload)
     if isinstance(payload, list):
         return payload
-    if not isinstance(payload, dict):
-        return []
     data = payload.get("data")
     if isinstance(data, list):
         return data
@@ -259,7 +266,7 @@ class FXMacroDataClient:
             url = "%s?%s" % (url, urlencode(query))
         request = self._with_key(Request(url, headers=self._headers()))
         with urlopen(request, timeout=self.timeout) as response:  # nosec B310
-            return json.loads(response.read().decode("utf-8"))
+            return _validated_payload(json.loads(response.read().decode("utf-8")))
 
     def graphql(self, query, variables=None):
         body = json.dumps({"query": query, "variables": variables or {}}).encode(
@@ -369,7 +376,9 @@ class FXMacroDataClient:
                 dataset, limit=page_size, offset=offset, **kwargs
             )
             page = payload.get("data") if isinstance(payload, dict) else payload
-            if not isinstance(page, list) or not page:
+            if not isinstance(page, list):
+                raise ValueError("FXMacroData returned an invalid paginated response")
+            if not page:
                 break
             rows.extend(page)
             if limit is not None and len(rows) >= limit:

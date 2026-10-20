@@ -185,3 +185,65 @@ def test_api_key_is_stripped_and_rejected_without_echo(fake_api):
     with pytest.raises(ValueError) as excinfo:
         fxmacrodata.FXMacroDataClient(api_key="test-key\r\nX-Other: 1")
     assert "test-key" not in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "payload", [{"detail": "private upstream text"}, {"error": "private upstream text"}]
+)
+def test_error_payload_cannot_become_dataframe(payload):
+    with pytest.raises(ValueError, match="error response") as excinfo:
+        FXMacroDataClient().to_dataframe(payload)
+    assert "private upstream text" not in str(excinfo.value)
+
+
+@pytest.mark.parametrize("payload", [None, "unexpected text", 1, True])
+def test_invalid_payload_cannot_look_like_empty_data(payload):
+    with pytest.raises(ValueError, match="invalid response"):
+        FXMacroDataClient().to_dataframe(payload)
+
+
+@pytest.mark.parametrize(
+    "payload", [{"detail": "private upstream text"}, {"error": "private upstream text"}, None]
+)
+def test_fetch_dataset_rejects_invalid_payload(monkeypatch, payload):
+    monkeypatch.setattr(
+        fxmacrodata, "urlopen", lambda *args, **kwargs: _Response(payload)
+    )
+    with pytest.raises(ValueError):
+        FXMacroDataClient().fetch_dataset("calendar", currency="usd")
+
+
+@pytest.mark.parametrize(
+    "bad_page",
+    [{"detail": "private upstream text"}, {"error": "private upstream text"}, {},
+     {"data": {}}, None],
+)
+def test_bad_later_page_does_not_return_partial_history(monkeypatch, bad_page):
+    pages = iter(
+        [
+            {
+                "data": [{"date": "2024-01-01", "val": 1.0}],
+                "pagination": {"has_more": True, "next_offset": 1},
+            },
+            bad_page,
+        ]
+    )
+    monkeypatch.setattr(
+        fxmacrodata, "urlopen", lambda *args, **kwargs: _Response(next(pages))
+    )
+    with pytest.raises(ValueError):
+        FXMacroDataClient().dataframe("forex", base="eur", quote="usd")
+
+
+def test_successful_empty_page_is_still_empty(monkeypatch):
+    monkeypatch.setattr(
+        fxmacrodata, "urlopen", lambda *args, **kwargs: _Response({"data": []})
+    )
+    assert FXMacroDataClient().dataframe("forex", base="eur", quote="usd").empty
+
+
+def test_list_pages_are_still_supported(monkeypatch):
+    monkeypatch.setattr(
+        fxmacrodata, "urlopen", lambda *args, **kwargs: _Response(_rows(2))
+    )
+    assert len(FXMacroDataClient().dataframe("forex", base="eur", quote="usd")) == 2
